@@ -2,39 +2,69 @@ import numpy as np
 
 
 class NeuralNetwork:
-    def __init__(self, input_dim, output_dim ,network_layers_architecture: list):
+    def __init__(self, input_dim, output_dim ,nn_archtre: list):
 
-        self.main_model = []
-        for index, layer in enumerate(network_layers_architecture):
-            self.main_model.append({'weights': [], 'biases': [], 'activation': ''})
-            if index == 0:
-                self.main_model[index]['weights'] = np.random.rand(layer['num_neurons'], input_dim)
-            elif index == len(network_layers_architecture) - 1:
-                self.main_model[index]['weights'] = np.random.rand(output_dim, layer['num_neurons'])
-            else:
-                self.main_model[index]['weights'] = np.random.rand(layer['num_neurons'], layer[index-1]['num_neurons'])
-            self.main_model[index]['activation'] =  layer['activation']
-            self.main_model[index]['biases'] = np.random.rand(1)[0]
+        self.num_layers = len(nn_archtre)
+        self.main_model = {'weights': [], 'biases': [], 'activation': []}
+        self.main_model['weights'].append(np.random.rand(input_dim, nn_archtre[0]['num_neurons']))
+        self.main_model['biases'].append(np.random.rand())
+        self.main_model['activation'].append(nn_archtre[0]['activation'])
+
+        for index, layer in enumerate(nn_archtre[1:self.num_layers-1]):
+            self.main_model['weights'].append(np.random.rand(layer[index]['num_neurons'], layer['num_neurons']))
+            self.main_model['biases'].append(np.random.rand())
+            self.main_model['activation'].append(layer['activation'])
+
+        self.main_model['weights'].append(np.random.rand(output_dim, nn_archtre[len(nn_archtre)-1]['num_neurons']))
+        self.main_model['biases'].append(np.random.rand())
+        self.main_model['activation'].append(nn_archtre[len(nn_archtre)-1]['activation'])
+
+        
+        
 
     def feed_forward(self, input_data):
-        print(self.main_model[0]['weights'].shape)
-        final_output = np.dot(self.main_model[0]['weights'], input_data) + self.main_model[0]['biases']
-        activation = getattr(self, self.main_model[0]['activation'], 'sigmoid')
+        final_output = np.dot(input_data, self.main_model['weights'][0]) + self.main_model['biases'][0]
+        activation = getattr(self, self.main_model['activation'][0], self.sigmoid)
         final_output = activation(final_output)
-        for layer in self.main_model[1:]:
-            final_output = np.dot(layer['weights'], final_output) + layer['biases']
-            activation = getattr(self, layer['activation'], 'sigmoid')
+        for layer in range(1, self.num_layers):
+            final_output = np.dot(self.main_model['weights'][layer], final_output) + self.main_model['biases'][layer]
+            activation = getattr(self, self.main_model['activation'][layer], self.sigmoid)
             final_output = activation(final_output)
         return final_output
     
-    def relu(self, pre_activation):
-        return np.maximum(0, pre_activation)
+    def back_propagation(self, train_data):
+        delta_weights = [np.random.rand(*layer.shape) for layer in self.main_model['weights']]
+        delta_biases = [np.random.rand() for _ in self.main_model['biases']]
+        return delta_weights, delta_biases
 
     def softmax(self, pre_activation):
         return np.exp(pre_activation) / np.sum(np.exp(pre_activation), axis=0)
+    
+    def sigmoid(self, pre_activation):
+        return 1 / (1 + np.exp(-pre_activation))
+    
+    def tanh(self, pre_activation):
+        return np.tanh(pre_activation)
+    
+    def identity(self, pre_activation):
+        return pre_activation
 
-    def train(self):
-        pass
+    def train(self, train_data, epochs, learning_rate):
+        print('training started...')
+        for epoch in range(epochs):
+            delta_weight, delta_bias = self.back_propagation(train_data)
+            self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight[i] for i in range(self.num_layers)]
+            self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias[i] for i in range(self.num_layers)]
+        print('training ended...')
+        
+
+
+            
+    def loss_mse(self, y_true, y_pred):
+        return np.mean((y_true - y_pred) ** 2)
+
+    def loss_cross_entropy(self, y_true, y_pred):
+        return -np.sum(y_true * np.log(y_pred))
 
     def predict(self):
         pass
