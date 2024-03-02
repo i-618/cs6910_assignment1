@@ -2,6 +2,10 @@ print('Now starts the program...')
 
 from FeedForward.NeuralNetwork import NeuralNetwork
 layers = [{'num_neurons': 3, 'activation': 'relu'},
+          {'num_neurons': 3, 'activation': 'relu'},
+          {'num_neurons': 5, 'activation': 'relu'},
+          {'num_neurons': 10, 'activation': 'relu'},
+          {'num_neurons': 9, 'activation': 'relu'},
           {'num_neurons': 3, 'activation': 'softmax'},]
 nn = NeuralNetwork(input_dim=2, output_dim=5, nn_archtre=layers)
 
