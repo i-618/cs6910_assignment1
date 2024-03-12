@@ -18,14 +18,14 @@ print(ohl_train.shape)
 print(x_train.shape, ohl_train.shape)
 # nn = Network([x_train.shape[1], 5, ohl_train.shape[1]])
 # training_data = list(zip(x_train[:10], ohl_train[:10]))
-training_inputs = [np.reshape(x, (784, 1)) for x in x_train]
-training_results = [np.reshape(x, (len(np.unique(y_train)), 1)) for x in ohl_train]
+training_inputs = x_train.reshape(-1, 784, 1)
+training_results = ohl_train.reshape(-1, 10, 1)
 
 training_data = list(zip(training_inputs[:20], training_results[:20]))
 testing_data = list(zip(training_inputs[-10:], training_results[-10:]))
 print(training_data[0][0][1])
-net = Network([784, 30, 10])
-net.SGD(training_data, 10, 10, 3.0, test_data=testing_data)
+net = Network([784, 30, 50, 10])
+net.SGD(training_data, 100, 20, 3.0, test_data=testing_data)
 print(net.feedforward(training_inputs[0]))
 
 # net.SGD(training_data, epochs=10, mini_batch_size=10, eta=0.1, test_data=testing_data)

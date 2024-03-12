@@ -63,8 +63,8 @@ class Network(object):
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
             if test_data:
-                print( "Epoch {0}: {1} / {2}".format(
-                    j, self.evaluate(test_data), n_test))
+                print( "Epoch {0}: {1}".format(
+                    j, self.loss_cross_entropy(test_data)))
             else:
                 print( "Epoch {0} complete".format(j))
 
@@ -132,8 +132,12 @@ class Network(object):
         # return sum(cross_entrophy_list)
         # [print(x == y) for (x, y) in test_results]
 
-    def cross_entrophy(self, y, a):
-        return np.sum(np.nan_to_num(-y*np.log(a)-(1-y)*np.log(1-a)))
+    def loss_cross_entropy(self, test_data):
+        cross_entrophy = 0
+        for x, y in test_data:
+            y_pred = self.feedforward(x)
+            cross_entrophy += np.sum(y * np.log(y_pred))
+        return -cross_entrophy/len(test_data)
 
     def cost_derivative(self, output_activations, y):
         """Return the vector of partial derivatives \partial C_x /
