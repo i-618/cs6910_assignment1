@@ -21,8 +21,7 @@ class NeuralNetwork:
         self.main_model['activation'].append(last_layer_activation)
 
         [print(i.shape, j) for i, j in zip(self.main_model['weights'], self.main_model['activation'])]
-        print('arr_len', len(self.main_model['activation']))
-        print('num_layers', self.num_layers)
+        
 
     def feed_forward(self, input_data, return_layer_outputs=True):
             layer_outputs = {'activation':[], 'pre_activation':[]} 
@@ -40,6 +39,7 @@ class NeuralNetwork:
                 final_output = activation(final_output)
                 layer_outputs['activation'].append(final_output)
             if return_layer_outputs:
+                [print(i.shape, j.shape) for i, j in zip(layer_outputs['activation'], layer_outputs['pre_activation'])]
                 return layer_outputs
             else:
                 return final_output
@@ -55,28 +55,17 @@ class NeuralNetwork:
         
                 # feed forward
         layer_outputs = self.feed_forward(x, return_layer_outputs=True)
-        print('loss', self.loss_mse(y, layer_outputs['activation'][-1]))
-        # print('self num of layers    ', self.num_layers)
-        # print('shape of layer_outputs activation    ', list(map(lambda x: x.shape, layer_outputs['activation'])))
-        # print('shape of layer_outputs pre-activation', list(map(lambda x: x.shape, layer_outputs['pre_activation'])))
-        layer_ouput = layer_outputs['activation'][-1]
-        dAL = - (np.divide(y, layer_ouput) - np.divide(1 - y, 1 - layer_ouput))
-        dZ = dAL * self.sigmoid_derivative(layer_ouput)
-        delta_weights[-1] = 1 / x.shape[0] * np.dot(dZ, layer_ouput.T)
-        delta_biases[-1] = 1 / x.shape[0] * np.sum(dZ, keepdims=True)
+        cost_derivative = layer_outputs['activation'][-1] - y
 
+        delta = cost_derivative * self.sigmoid_derivative(layer_outputs['pre_activation'][-1])
+
+        delta_biases[-1] = delta
+        delta_weights[-1] = np.dot(delta, layer_outputs['activation'][-2].transpose())
+        
         for i in range(2, self.num_layers):
-            
-            dA_prev = np.dot( self.main_model['weights'][-i+1].T, dZ)
-            
-            actv_derivative = getattr(self, self.main_model['activation'][-i] + '_derivative' , self.sigmoid_derivative)
-            
-            dZ = dA_prev * actv_derivative(layer_outputs['pre_activation'][-i])
-            delta_weights[-i] = 1 / x.shape[0] * np.dot(dZ, layer_outputs['activation'][-i].T)
-            delta_biases[-i] = 1 / x.shape[0] * np.sum(dZ, keepdims=True)
-        
-        
-
+            delta = np.dot(self.main_model['weights'][-i+1].transpose(), delta) * self.sigmoid_derivative(layer_outputs['pre_activation'][-i])
+            delta_biases[-i] = delta
+            delta_weights[-i] = np.dot(delta, layer_outputs['activation'][-i-1].transpose())
         return delta_weights, delta_biases
 
     def softmax(self, pre_activation):
@@ -125,6 +114,8 @@ class NeuralNetwork:
             # print('delta_weight', delta_weight)
                 self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight[i] for i in range(self.num_layers)]
                 self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias[i] for i in range(self.num_layers)]
+            if epoch % 100 == 0:
+                print('epoch:', epoch, 'loss:', self.loss_mse(y, self.feed_forward(x, return_layer_outputs=False)))
         print('training ended...')
         
 
