@@ -124,9 +124,16 @@ class Network(object):
         network outputs the correct result. Note that the neural
         network's output is assumed to be the index of whichever
         neuron in the final layer has the highest activation."""
-        test_results = [(np.argmax(self.feedforward(x)), y)
+        test_results = [(np.argmax(self.feedforward(x)), np.argmax(y))
                         for (x, y) in test_data]
+    
+        cross_entrophy_list = [self.cross_entrophy(y, self.feedforward(x)) for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
+        # return sum(cross_entrophy_list)
+        # [print(x == y) for (x, y) in test_results]
+
+    def cross_entrophy(self, y, a):
+        return np.sum(np.nan_to_num(-y*np.log(a)-(1-y)*np.log(1-a)))
 
     def cost_derivative(self, output_activations, y):
         """Return the vector of partial derivatives \partial C_x /
