@@ -24,6 +24,9 @@ class NeuralNetwork:
         self.main_model['activation'].append(last_layer_activation)
 
         [print(i.shape, j) for i, j in zip(self.main_model['weights'], self.main_model['activation'])]
+
+        self.mom_grad_descent_attr = {'previous_delta_weight': [np.zeros_like(layer) for layer in self.main_model['weights']], 
+                                      'previous_delta_bias': [np.zeros_like(bias) for bias in self.main_model['biases']], 'beta': 0.9}
         
 
     def feed_forward(self, input_data, return_layer_outputs=True):
@@ -71,8 +74,10 @@ class NeuralNetwork:
     
     def softmax_derivative(self, pre_activation):
         return pre_activation
-
     
+    def sigmoid(self, pre_activation):
+        return 1 / (1 + np.exp(-pre_activation))
+
     def sigmoid_derivative(self, pre_activation):
         return pre_activation * (1 - pre_activation)
     
@@ -81,9 +86,6 @@ class NeuralNetwork:
     
     def relu_derivative(self, pre_activation):
         return 1 * (pre_activation > 0)
-    
-    def sigmoid(self, pre_activation):
-        return 1 / (1 + np.exp(-pre_activation))
     
     def tanh(self, pre_activation):
         return np.tanh(pre_activation)
@@ -96,9 +98,24 @@ class NeuralNetwork:
         self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
 
     def momentum_gradient_descent(self, delta_weight_complete, delta_bias_complete, learning_rate):
-        self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
-        self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
+        momentum_gradient_weights = [self.mom_grad_descent_attr['beta'] * self.mom_grad_descent_attr['previous_delta_weight'][i] + learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
+        momentum_gradient_bias = [self.mom_grad_descent_attr['beta'] * self.mom_grad_descent_attr['previous_delta_bias'][i] + learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
+        
+        self.main_model['weights'] = [self.main_model['weights'][i] - momentum_gradient_weights[i] for i in range(self.num_layers)]
+        self.main_model['biases'] = [self.main_model['biases'][i] - momentum_gradient_bias[i] for i in range(self.num_layers)]
 
+        self.mom_grad_descent_attr['previous_delta_weight'] = momentum_gradient_weights
+        self.mom_grad_descent_attr['previous_delta_bias'] = momentum_gradient_bias
+
+    def nesterov_accelerated_gradient(self, delta_weight_complete, delta_bias_complete, learning_rate):
+        momentum_gradient_weights = [self.mom_grad_descent_attr['beta'] * self.mom_grad_descent_attr['previous_delta_weight'][i] + learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
+        momentum_gradient_bias = [self.mom_grad_descent_attr['beta'] * self.mom_grad_descent_attr['previous_delta_bias'][i] + learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
+        
+        self.main_model['weights'] = [self.main_model['weights'][i] - momentum_gradient_weights[i] for i in range(self.num_layers)]
+        self.main_model['biases'] = [self.main_model['biases'][i] - momentum_gradient_bias[i] for i in range(self.num_layers)]
+
+        self.mom_grad_descent_attr['previous_delta_weight'] = momentum_gradient_weights
+        self.mom_grad_descent_attr['previous_delta_bias'] = momentum_gradient_bias
 
 
     def train(self, train_data, test_data, epochs, learning_rate, optimizer, weight_decay, batch_size):
@@ -116,6 +133,7 @@ class NeuralNetwork:
                     delta_bias_complete = [delta_bias_complete[i] + delta_bias[i] for i in range(self.num_layers)]
                 delta_weight_complete = [delta_weight_complete[i] / batch_size for i in range(self.num_layers)]
                 delta_bias_complete = [delta_bias_complete[i] / batch_size for i in range(self.num_layers)]
+            
             gradient_descent_optimizer(delta_weight_complete, delta_bias_complete, learning_rate)
             if epoch % 10 == 0:
                 print('epoch:', epoch, 'loss:', self.total_loss(test_data))
