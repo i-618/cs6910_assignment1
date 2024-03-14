@@ -15,7 +15,9 @@ for index, item in enumerate(y_train):
 x_train_flattened = x_train.reshape(-1, 784, 1)
 
 
-layers = [{'num_neurons': 30, 'activation': 'sigmoid'},
+layers = [{'num_neurons': 100, 'activation': 'sigmoid'},
+          {'num_neurons': 50, 'activation': 'sigmoid'},
+          {'num_neurons': 50, 'activation': 'sigmoid'},
           {'num_neurons': 50, 'activation': 'sigmoid'},
           ]
 nn = NeuralNetwork(input_dim=x_train_flattened.shape[1], output_dim=one_hot_label.shape[1], nn_archtre=layers, 
@@ -23,9 +25,10 @@ nn = NeuralNetwork(input_dim=x_train_flattened.shape[1], output_dim=one_hot_labe
 resp = nn.feed_forward(x_train_flattened[0], return_layer_outputs=False)
 print(sum(resp), resp)
 
-train_data={'inputs':x_train_flattened[:2000], 'labels':one_hot_label[:2000]}
+train_data={'inputs':x_train_flattened[:500], 'labels':one_hot_label[:500]}
+val_data={'inputs':x_train_flattened[-100:], 'labels':one_hot_label[-100:]}
 
-nn.train(train_data=train_data, epochs=500, learning_rate=0.00001)
+nn.train(train_data=train_data, val_data=val_data, epochs=500, learning_rate=0.5, optimizer='nadam', weight_decay=0, batch_size=50)
 
 # for inp in train_data['inputs']:
 #     print(inp, nn.feed_forward(inp, return_layer_outputs=False))

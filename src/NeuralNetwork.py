@@ -1,4 +1,5 @@
 import numpy as np 
+
 class NeuralNetwork:
 
     def __init__(self, input_dim ,nn_archtre: list, output_dim, last_layer_activation='softmax', weight_initializer='random'):
@@ -6,6 +7,7 @@ class NeuralNetwork:
         self.num_layers = len(nn_archtre) + 1
         self.main_model = {'weights': [], 'biases': [], 'activation': []}
         self.last_layer_activation = last_layer_activation
+        self.weight_initializer = weight_initializer
         initializer = getattr(self, 'init_' + weight_initializer, self.init_random)
         # Initializing First Layer that takes in input_dim
         self.main_model['weights'].append(initializer(nn_archtre[0]['num_neurons'], input_dim))
@@ -31,6 +33,15 @@ class NeuralNetwork:
                                       'previous_learnrate_delta_bias': [np.zeros_like(bias) for bias in self.main_model['biases']],
                                       }
         
+    def reinitialize_weights(self):
+        initializer = getattr(self, 'init_' + self.weight_initializer, self.init_random)
+        self.main_model['weights'] = [initializer(*layer.shape) for layer in self.main_model['weights']]
+        self.main_model['biases'] = [initializer(*bias.shape) for bias in self.main_model['biases']]
+        self.mom_grad_descent_attr = {'previous_delta_weight': [np.zeros_like(layer) for layer in self.main_model['weights']], 
+                                      'previous_delta_bias': [np.zeros_like(bias) for bias in self.main_model['biases']],
+                                      'previous_learnrate_delta_weight': [np.zeros_like(layer) for layer in self.main_model['weights']], 
+                                      'previous_learnrate_delta_bias': [np.zeros_like(bias) for bias in self.main_model['biases']],
+                                      }
 
     def feed_forward(self, input_data, return_layer_outputs=False, specific_model=None):
             # Using the latest weights to caluculate the output
@@ -71,8 +82,11 @@ class NeuralNetwork:
         delta_weights = [np.zeros_like(layer) for layer in main_model['weights']]
         delta_biases = [np.zeros_like(bias) for bias in main_model['biases']]
         layer_outputs = self.feed_forward(x, return_layer_outputs=True, specific_model=specific_model)
-        cost_derivative = layer_outputs['activation'][-1] - y
-        last_layer_derivative = getattr(self, self.last_layer_activation + '_derivative', self.sigmoid_derivative)
+        cost_derivative = layer_outputs['activation'][-1] - y 
+
+
+        last_layer_derivative = self.sigmoid_derivative
+        # getattr(self, self.last_layer_activation + '_derivative', self.sigmoid_derivative)
         delta = cost_derivative * last_layer_derivative(layer_outputs['pre_activation'][-1])
         
         delta_biases[-1] = delta
@@ -80,7 +94,7 @@ class NeuralNetwork:
         
         for i in range(2, self.num_layers):
             activation_derivative = getattr(self, main_model['activation'][-i]+'_derivative', self.sigmoid_derivative)
-            delta = np.dot(main_model['weights'][-i+1].transpose(), delta) * activation_derivative (layer_outputs['pre_activation'][-i])
+            delta = np.dot(main_model['weights'][-i+1].transpose(), delta) * activation_derivative(layer_outputs['pre_activation'][-i])
             delta_biases[-i] = delta
             delta_weights[-i] = np.dot(delta, layer_outputs['activation'][-i-1].transpose())
         return delta_weights, delta_biases
@@ -97,7 +111,7 @@ class NeuralNetwork:
         return 1 / (1 + np.exp(-pre_activation))
 
     def sigmoid_derivative(self, pre_activation):
-        return pre_activation * (1 - pre_activation)
+        return self.sigmoid(pre_activation) * (1 - self.sigmoid(pre_activation))
     
     def linear_derivative(self, pre_activation):
         return 1
@@ -117,9 +131,18 @@ class NeuralNetwork:
     def init_random(self, input_dim, output_dim):
         return np.random.randn(input_dim, output_dim)
 
-    def total_loss(self, test_data, loss_type = 'mse'):
+    def total_loss_accuracy(self, test_data, loss_type = 'mse'):
         loss_type = getattr(self, 'loss_' + loss_type, self.loss_mse)
-        return np.sum([loss_type(y, self.feed_forward(x, return_layer_outputs=False)) for x, y in test_data])
+        size_data = len(test_data['inputs'])
+        model_output = [self.feed_forward(test_data['inputs'][i]) for i in range(size_data)]
+        total_loss = np.sum([loss_type(test_data['labels'][i], model_output[i]) for i in range(size_data) ])
+        total_accuracy = np.sum([np.argmax(test_data['labels'][i]) == np.argmax(model_output[i]) for i in range(size_data) ])
+        # total_loss = total_loss / size_data
+        total_accuracy = total_accuracy / size_data
+        if np.isnan(total_loss):
+            print('reinitializing weights as loss is nan')
+            self.reinitialize_weights()
+        return total_loss, total_accuracy
 
     def loss_mse(self, y_true, y_pred):
         return np.mean((y_true - y_pred) ** 2)
@@ -133,56 +156,72 @@ class NeuralNetwork:
     def loss_cross_entropy_derivative(self, y_true, y_pred):
         return y_pred - y_true
 
+    def add_l2_regularization_penalty(self, delta_weight, delta_bias, weight_decay):
+        delta_weight = [delta_weight[i] + weight_decay * np.sum((self.main_model['weights'][i])) for i in range(self.num_layers)]
+        delta_bias = [delta_bias[i] + weight_decay * np.sum((self.main_model['biases'][i])) for i in range(self.num_layers)]
+        return delta_weight, delta_bias
 
-    def train(self, train_data, test_data, epochs, learning_rate, optimizer, weight_decay, batch_size):
-        gradient_descent_optimizer = getattr(self, optimizer, self.stochastic_gradient_descent)
+    def train(self, train_data, val_data, epochs, learning_rate, optimizer, weight_decay, batch_size):
+        gradient_descent_optimizer = getattr(self, optimizer + '_gradient_descent', self.stochastic_gradient_descent)
         for epoch in range(epochs):
             num_batches = len(train_data['inputs']) // batch_size
             for batch in range(num_batches):
-                gradient_descent_optimizer(train_data, batch_size, batch, learning_rate)
+                gradient_descent_optimizer(train_data=train_data, batch_size=batch_size, batch=batch, learning_rate=learning_rate, weight_decay=weight_decay, epoch=epoch)
             if epoch % 10 == 0:
-                print('epoch:', epoch, 'loss:', self.total_loss(test_data))
+                print('epoch:', epoch, 'train_loss_acc:', self.total_loss_accuracy(train_data), 'val_loss_acc:', self.total_loss_accuracy(val_data))
 
     
-    def stochastic_gradient_descent(self, train_data, batch_size, batch, learning_rate):
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch)
+    def stochastic_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, **kwargs):
+        
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch)
+
+        delta_weight_complete, delta_bias_complete = self.add_l2_regularization_penalty(delta_weight_complete, delta_bias_complete, weight_decay)
 
         self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
         self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
 
-    def momentum_gradient_descent(self, train_data, batch_size, batch, learning_rate, beta):
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch)
+    def momentum_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, beta=0.6, **kwargs):
+        
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch)
 
         momentum_gradient_weights = [beta * self.mom_grad_descent_attr['previous_delta_weight'][i] + learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
         momentum_gradient_bias = [beta * self.mom_grad_descent_attr['previous_delta_bias'][i] + learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
         
+        momentum_gradient_weights, momentum_gradient_bias = self.add_l2_regularization_penalty(momentum_gradient_weights, momentum_gradient_bias, weight_decay)
+
         self.main_model['weights'] = [self.main_model['weights'][i] - momentum_gradient_weights[i] for i in range(self.num_layers)]
         self.main_model['biases'] = [self.main_model['biases'][i] - momentum_gradient_bias[i] for i in range(self.num_layers)]
 
         self.mom_grad_descent_attr['previous_delta_weight'] = momentum_gradient_weights
         self.mom_grad_descent_attr['previous_delta_bias'] = momentum_gradient_bias
 
-    def nag_gradient_descent(self, train_data, batch_size, batch, learning_rate, beta):
+    def nag_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, beta=0.6, **kwargs):
+        
         look_ahead_weights = [self.main_model['weights'][i] - beta * self.mom_grad_descent_attr['previous_delta_weight'][i] for i in range(self.num_layers)]
         look_ahead_bias = [self.main_model['biases'][i] - beta * self.mom_grad_descent_attr['previous_delta_bias'][i] for i in range(self.num_layers)]
-        look_ahead_model = {'weights': look_ahead_weights, 'biases': look_ahead_bias}
+        look_ahead_model = {'weights': look_ahead_weights, 'biases': look_ahead_bias, 'activation': self.main_model['activation']}
 
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch, look_ahead_model)
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch, look_ahead_model)
 
         nestrov_delta_weight = [beta * self.mom_grad_descent_attr['previous_delta_weight'][i] + learning_rate * delta_weight_complete[i] for i in range(self.num_layers)]
         nestrov_delta_bias = [beta * self.mom_grad_descent_attr['previous_delta_bias'][i] + learning_rate * delta_bias_complete[i] for i in range(self.num_layers)]
-
+        
+        nestrov_delta_weight, nestrov_delta_bias = self.add_l2_regularization_penalty(nestrov_delta_weight, nestrov_delta_bias, weight_decay)
+        
         self.main_model['weights'] = [self.main_model['weights'][i] - nestrov_delta_weight[i] for i in range(self.num_layers)]
         self.main_model['biases'] = [self.main_model['biases'][i] - nestrov_delta_bias[i] for i in range(self.num_layers)]
 
         self.mom_grad_descent_attr['previous_delta_weight'] = nestrov_delta_weight
         self.mom_grad_descent_attr['previous_delta_bias'] = nestrov_delta_bias
 
-    def rms_gradient_descent(self, train_data, batch_size, batch, learning_rate, beta, epsilon):
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch)
+    def rmsprop_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, beta=0.5, epsilon=0.5, **kwargs):
+        
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch)
 
         rms_gradient_weights = [beta * self.mom_grad_descent_attr['previous_delta_weight'][i] + (1 - beta) * np.square(delta_weight_complete[i]) for i in range(self.num_layers)]
         rms_gradient_bias = [beta * self.mom_grad_descent_attr['previous_delta_bias'][i] + (1 - beta) * np.square(delta_bias_complete[i]) for i in range(self.num_layers)]
+
+        delta_weight_complete, delta_bias_complete = self.add_l2_regularization_penalty(delta_weight_complete, delta_bias_complete, weight_decay)
 
         self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight_complete[i] / (np.sqrt(rms_gradient_weights[i]) + epsilon) for i in range(self.num_layers)]
         self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias_complete[i] / (np.sqrt(rms_gradient_bias[i]) + epsilon) for i in range(self.num_layers)]
@@ -190,14 +229,17 @@ class NeuralNetwork:
         self.mom_grad_descent_attr['previous_delta_weight'] = rms_gradient_weights
         self.mom_grad_descent_attr['previous_delta_bias'] = rms_gradient_bias
 
-    def adam_gradient_descent(self, train_data, batch_size, batch, epoch, learning_rate, beta1, beta2, epsilon):
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch)
+    def adam_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, epoch, beta1=0.5, beta2=0.5, epsilon=0.5, **kwargs):
+        
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch)
 
         self.mom_grad_descent_attr['previous_delta_weight'] = [beta1 * self.mom_grad_descent_attr['previous_delta_weight'][i] + (1 - beta1) * delta_weight_complete[i] for i in range(self.num_layers)]
         delta_weight_bias_correction = [self.mom_grad_descent_attr['previous_delta_weight'][i] / (1 - beta1 ** (epoch + 1)) for i in range(self.num_layers)]
         self.mom_grad_descent_attr['previous_delta_bias'] = [beta1 * self.mom_grad_descent_attr['previous_delta_bias'][i] + (1 - beta1) * delta_bias_complete[i] for i in range(self.num_layers)]
         delta_bias_bias_correction = [self.mom_grad_descent_attr['previous_delta_bias'][i] / (1 - beta1 ** (epoch + 1)) for i in range(self.num_layers)]    
 
+        delta_weight_bias_correction, delta_bias_bias_correction = self.add_l2_regularization_penalty(delta_weight_bias_correction, delta_bias_bias_correction, weight_decay)
+        
         self.mom_grad_descent_attr['previous_learnrate_delta_weight'] = [beta2 * self.mom_grad_descent_attr['previous_learnrate_delta_weight'][i] + (1 - beta2) * np.square(delta_weight_complete[i]) for i in range(self.num_layers)]
         learnrate_delta_weight_bias_correction = [self.mom_grad_descent_attr['previous_learnrate_delta_weight'][i] / (1 - beta2 ** (epoch + 1)) for i in range(self.num_layers)]
         self.mom_grad_descent_attr['previous_learnrate_delta_bias'] = [beta2 * self.mom_grad_descent_attr['previous_learnrate_delta_bias'][i] + (1 - beta2) * np.square(delta_bias_complete[i]) for i in range(self.num_layers)]
@@ -206,14 +248,17 @@ class NeuralNetwork:
         self.main_model['weights'] = [self.main_model['weights'][i] - learning_rate * delta_weight_bias_correction[i] / (np.sqrt(learnrate_delta_weight_bias_correction[i]) + epsilon) for i in range(self.num_layers)]
         self.main_model['biases'] = [self.main_model['biases'][i] - learning_rate * delta_bias_bias_correction[i] / (np.sqrt(learnrate_delta_bias_bias_correction[i]) + epsilon) for i in range(self.num_layers)]
 
-    def nadam_gradient_descent(self, train_data, batch_size, batch, learning_rate, epoch, beta1, beta2, epsilon):
+    def nadam_gradient_descent(self, train_data, batch_size, batch, learning_rate, weight_decay, epoch, beta1=0.6, beta2=0.5, epsilon=0.5, **kwargs):
+        
         # refered https://github.com/TannerGilbert/Machine-Learning-Explained/blob/master/Optimizers/nadam/code/nadam.py
-        delta_weight_complete, delta_bias_complete = self.gradient_batch_data(train_data, batch_size, batch)
+        delta_weight_complete, delta_bias_complete = self.gradient_batch_wise_data(train_data, batch_size, batch)
 
         self.mom_grad_descent_attr['previous_delta_weight'] = [beta1 * self.mom_grad_descent_attr['previous_delta_weight'][i] + (1 - beta1) * delta_weight_complete[i] for i in range(self.num_layers)]
         delta_weight_bias_correction = [self.mom_grad_descent_attr['previous_delta_weight'][i] / (1 - beta1 ** (epoch + 1)) for i in range(self.num_layers)]
         self.mom_grad_descent_attr['previous_delta_bias'] = [beta1 * self.mom_grad_descent_attr['previous_delta_bias'][i] + (1 - beta1) * delta_bias_complete[i] for i in range(self.num_layers)]
         delta_bias_bias_correction = [self.mom_grad_descent_attr['previous_delta_bias'][i] / (1 - beta1 ** (epoch + 1)) for i in range(self.num_layers)]    
+
+        delta_weight_bias_correction, delta_bias_bias_correction = self.add_l2_regularization_penalty(delta_weight_bias_correction, delta_bias_bias_correction, weight_decay)
 
         self.mom_grad_descent_attr['previous_learnrate_delta_weight'] = [beta2 * self.mom_grad_descent_attr['previous_learnrate_delta_weight'][i] + (1 - beta2) * np.square(delta_weight_complete[i]) for i in range(self.num_layers)]
         learnrate_delta_weight_bias_correction = [self.mom_grad_descent_attr['previous_learnrate_delta_weight'][i] / (1 - beta2 ** (epoch + 1)) for i in range(self.num_layers)]
@@ -226,7 +271,7 @@ class NeuralNetwork:
 
     
 
-    def gradient_batch_data(self, train_data, batch_size, batch, specific_model=None):
+    def gradient_batch_wise_data(self, train_data, batch_size, batch, specific_model=None):
         delta_weight_complete = [np.zeros_like(layer) for layer in self.main_model['weights']]
         delta_bias_complete = [np.zeros_like(bias) for bias in self.main_model['biases']]
         train_input_batch = train_data['inputs'][batch*batch_size: (batch+1)*batch_size]

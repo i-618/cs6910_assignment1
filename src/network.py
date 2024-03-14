@@ -62,11 +62,10 @@ class Network(object):
                 for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
-            if test_data:
-                print( "Epoch {0}: {1}".format(
-                    j, self.loss_cross_entropy(test_data)))
-            else:
-                print( "Epoch {0} complete".format(j))
+            if test_data and j%50 == 0:
+                print( "Epoch {0}: {1} acc: {2}".format(
+                    j, self.loss_cross_entropy(test_data), self.evaluate(test_data)))
+            
 
     def update_mini_batch(self, mini_batch, eta):
         """Update the network's weights and biases by applying
@@ -127,8 +126,8 @@ class Network(object):
         test_results = [(np.argmax(self.feedforward(x)), np.argmax(y))
                         for (x, y) in test_data]
     
-        cross_entrophy_list = [self.cross_entrophy(y, self.feedforward(x)) for (x, y) in test_data]
-        return sum(int(x == y) for (x, y) in test_results)
+        # cross_entrophy_list = [self.cross_entrophy(y, self.feedforward(x)) for (x, y) in test_data]
+        return sum(int(x == y) for (x, y) in test_results) / len(test_data)
         # return sum(cross_entrophy_list)
         # [print(x == y) for (x, y) in test_results]
 
