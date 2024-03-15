@@ -16,19 +16,21 @@ x_train_flattened = x_train.reshape(-1, 784, 1)
 
 
 layers = [{'num_neurons': 100, 'activation': 'sigmoid'},
-          {'num_neurons': 50, 'activation': 'sigmoid'},
-          {'num_neurons': 50, 'activation': 'sigmoid'},
+          {'num_neurons': 50, 'activation': 'relu'},
+          {'num_neurons': 50, 'activation': 'tanh'},
           {'num_neurons': 50, 'activation': 'sigmoid'},
           ]
 nn = NeuralNetwork(input_dim=x_train_flattened.shape[1], output_dim=one_hot_label.shape[1], nn_archtre=layers, 
-                   last_layer_activation='sigmoid', weight_initializer='xavier')
+                   last_layer_activation='softmax', weight_initializer='xavier')
 resp = nn.feed_forward(x_train_flattened[0], return_layer_outputs=False)
 print(sum(resp), resp)
 
-train_data={'inputs':x_train_flattened[:500], 'labels':one_hot_label[:500]}
-val_data={'inputs':x_train_flattened[-100:], 'labels':one_hot_label[-100:]}
 
-nn.train(train_data=train_data, val_data=val_data, epochs=500, learning_rate=0.5, optimizer='nadam', weight_decay=0, batch_size=50)
+test_records_count = int(len(x_train)*0.1)
+train_data={'inputs':x_train_flattened[:-test_records_count], 'labels':one_hot_label[:-test_records_count]}
+val_data={'inputs':x_train_flattened[-test_records_count:], 'labels':one_hot_label[-test_records_count:]}
+
+nn.train(train_data=train_data, val_data=val_data, epochs=10, learning_rate=5, optimizer='nadam', weight_decay=0.00005, batch_size=300, print_every_epoch=1)
 
 # for inp in train_data['inputs']:
 #     print(inp, nn.feed_forward(inp, return_layer_outputs=False))
