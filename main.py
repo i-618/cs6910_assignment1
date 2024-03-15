@@ -12,10 +12,10 @@ one_hot_label = np.zeros([y_train.shape[0], len(np.unique(y_train)), 1], dtype=i
 for index, item in enumerate(y_train):
   one_hot_label[index, item] = [1]
 
-x_train_flattened = x_train.reshape(-1, 784, 1)
+x_train_flattened = x_train.reshape(-1, 784, 1)/np.max(x_train)
 
 
-layers = [{'num_neurons': 100, 'activation': 'sigmoid'},
+layers = [
           {'num_neurons': 50, 'activation': 'relu'},
           {'num_neurons': 50, 'activation': 'tanh'},
           {'num_neurons': 50, 'activation': 'sigmoid'},
@@ -26,11 +26,12 @@ resp = nn.feed_forward(x_train_flattened[0], return_layer_outputs=False)
 print(sum(resp), resp)
 
 
+train_records_count = int(len(x_train)*0.9)
 test_records_count = int(len(x_train)*0.1)
-train_data={'inputs':x_train_flattened[:-test_records_count], 'labels':one_hot_label[:-test_records_count]}
+train_data={'inputs':x_train_flattened[:train_records_count], 'labels':one_hot_label[:train_records_count]}
 val_data={'inputs':x_train_flattened[-test_records_count:], 'labels':one_hot_label[-test_records_count:]}
-
-nn.train(train_data=train_data, val_data=val_data, epochs=10, learning_rate=5, optimizer='nadam', weight_decay=0.00005, batch_size=300, print_every_epoch=1)
+print('num train data:', len(train_data['inputs']), 'num val data:', len(val_data['inputs']))
+nn.train(train_data=train_data, val_data=val_data, epochs=5, learning_rate=0.0005, optimizer='nadam', weight_decay=0, batch_size=50, print_every_epoch=1)
 
 # for inp in train_data['inputs']:
 #     print(inp, nn.feed_forward(inp, return_layer_outputs=False))
