@@ -31,7 +31,7 @@ test_records_count = int(len(x_train)*0.1)
 train_data={'inputs':x_train_flattened[:train_records_count], 'labels':one_hot_label[:train_records_count]}
 val_data={'inputs':x_train_flattened[-test_records_count:], 'labels':one_hot_label[-test_records_count:]}
 print('num train data:', len(train_data['inputs']), 'num val data:', len(val_data['inputs']))
-nn.train(train_data=train_data, val_data=val_data, epochs=5, learning_rate=0.0005, optimizer='nadam', weight_decay=0, batch_size=50, print_every_epoch=1)
+nn.train(train_data=train_data, val_data=val_data, epochs=5, learning_rate=0.0005, optimizer='nadam', weight_decay=0.000, batch_size=50, print_every_epoch=1)
 
 # for inp in train_data['inputs']:
 #     print(inp, nn.feed_forward(inp, return_layer_outputs=False))
