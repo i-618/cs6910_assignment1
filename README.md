@@ -35,3 +35,10 @@ For Training the neural network:
 nn.train(train_data=train_data, val_data=val_data, epochs=10, learning_rate=0.001,
                  optimizer='adam', weight_decay=0, batch_size=64, print_every_epoch=1)
 ```
+
+train.py can be called to train the neural network with the following command: [Caution the trained neural network is not saved anywhere]
+```bash
+python train.py [-h] [-wp WANDB_PROJECT] [-we WANDB_ENTITY] [-sid WANDB_SWEEPID] [-d {mnist,fashion_mnist}] [-e EPOCHS] [-b BATCH_SIZE]
+                [-l {mean_squared_error,cross_entropy}] [-o {stochastic,momentum,nag,rmsprop,adam,nadam}] [-lr LEARNING_RATE] [-m MOMENTUM] [-beta BETA] [-beta1 BETA1] [-beta2 BETA2] [-eps EPSILON] [-w_d WEIGHT_DECAY] [-w_i {random,xavier}] [-nhl NUM_LAYERS]
+                [-sz HIDDEN_SIZE] [-a {identity,sigmoid,tanh,ReLU}]
+```
