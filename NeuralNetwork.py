@@ -130,7 +130,7 @@ class NeuralNetwork:
                 train_data_batch = {'inputs': train_input_batch, 'labels': train_label_batch}
 
                 gradient_descent_optimizer(train_data=train_data_batch, batch=batch, learning_rate=learning_rate, loss=loss, weight_decay=weight_decay, epoch=epoch+batch*10/num_batches, **kwargs)
-                if batch % int(num_batches/2) == 0:
+                if batch % int(1 + num_batches/2) == 0:
                     val_loss_acc = self._total_loss_accuracy(val_data, weight_decay=weight_decay)
                     print('Seconds taken', round((time.perf_counter() - time_per_batch), 2),'batch:', f'{batch + 1}/{num_batches}', 'val_loss_acc:', val_loss_acc)
                     time_per_batch = time.perf_counter()
