@@ -131,7 +131,7 @@ class NeuralNetwork:
 
                 gradient_descent_optimizer(train_data=train_data_batch, batch=batch, learning_rate=learning_rate, loss=loss, weight_decay=weight_decay, epoch=epoch+batch*10/num_batches, **kwargs)
                 if batch % int(1 + num_batches/2) == 0:
-                    val_loss_acc = self._total_loss_accuracy(val_data, weight_decay=weight_decay)
+                    val_loss_acc = self._total_loss_accuracy(val_data, weight_decay=weight_decay, loss_type=loss)
                     print('Seconds taken', round((time.perf_counter() - time_per_batch), 2),'batch:', f'{batch + 1}/{num_batches}', 'val_loss_acc:', val_loss_acc)
                     time_per_batch = time.perf_counter()
             if False and epoch % print_every_epoch == 0:
@@ -140,8 +140,8 @@ class NeuralNetwork:
                 print('Mins taken', round((time.perf_counter() - time_per_epoch)/60, 2),'epoch:', epoch+1, 'train_loss_acc:', train_loss_acc, 'val_loss_acc:', val_loss_acc)
                 time_per_epoch = time.perf_counter()
             
-            trn_loss, trn_accuracy = self._total_loss_accuracy(train_data, weight_decay=weight_decay)
-            val_loss, val_accuracy = self._total_loss_accuracy(val_data, weight_decay=weight_decay)
+            trn_loss, trn_accuracy = self._total_loss_accuracy(train_data, weight_decay=weight_decay, loss_type=loss)
+            val_loss, val_accuracy = self._total_loss_accuracy(val_data, weight_decay=weight_decay, loss_type=loss)
             print('Mins taken', round((time.perf_counter() - time_per_epoch)/60, 2),{'loss':trn_loss, 'accuracy': trn_accuracy, 'val_loss': val_loss, 'val_accuracy':val_accuracy, 'epoch': epoch})
             time_per_epoch = time.perf_counter()
             wandb.log({'loss':trn_loss, 'accuracy': trn_accuracy, 'val_loss': val_loss, 'val_accuracy':val_accuracy, 'epoch': epoch})
